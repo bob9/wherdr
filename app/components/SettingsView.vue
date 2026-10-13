@@ -214,7 +214,9 @@ const herdrName = computed(() => {
 })
 const followed = computed(() => themeById(resolveHerdrTheme(appConfig.value.herdrTheme, false).id))
 const themesOpen = ref(false)
-const currentTheme = computed(() => (themeChoice.value === FOLLOW_HERDR ? followed.value : themeById(themeChoice.value)))
+const currentTheme = computed(() => (themeChoice.value === FOLLOW_HERDR ? followed.value : resolveTheme(themeChoice.value)))
+// Themes made on this device, first in the picker.
+const myThemes = computed(() => customThemes.value.map(customThemeDef))
 const currentLabel = computed(() => (themeChoice.value === FOLLOW_HERDR
   ? `${t('Follow Herdr')}${followed.value ? ` · ${followed.value.label}` : ''}`
   : (currentTheme.value ? currentTheme.value.label : themeChoice.value)))
@@ -303,6 +305,19 @@ onMounted(() => {
               <UIcon :name="themesOpen ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'" class="theme-check" />
             </button>
             <div v-show="themesOpen" class="theme-list" role="radiogroup" :aria-label="t('Theme')">
+              <section v-if="myThemes.length" class="theme-section" :aria-label="t('Your themes')">
+                <h4 class="theme-section-title">{{ t('Your themes') }}</h4>
+                <div class="theme-grid">
+                  <button
+                    v-for="th in myThemes" :key="th.id" type="button" role="radio" class="theme-opt" :class="{ on: themeChoice === th.id }"
+                    :aria-checked="themeChoice === th.id" @click="pickTheme(th.id)"
+                  >
+                    <span class="theme-sw"><i v-for="(c, i) in swatches(th)" :key="i" :style="{ background: c }" /></span>
+                    <span class="theme-name">{{ th.label }}<small>{{ tl(`from ${themeById(th.base)?.label}`, `d’après ${themeById(th.base)?.label}`) }}</small></span>
+                    <UIcon v-if="themeChoice === th.id" name="i-lucide-check" class="theme-check" />
+                  </button>
+                </div>
+              </section>
               <section v-for="sec in themeSections()" :key="sec.group" class="theme-section" :aria-label="themeGroupLabel(sec.group)">
                 <h4 class="theme-section-title">{{ themeGroupLabel(sec.group) }}</h4>
                 <div class="theme-grid">
@@ -328,6 +343,7 @@ onMounted(() => {
                 </div>
               </section>
             </div>
+            <ThemeEditor />
           </div>
           <p class="muted settings-hint">{{ t('The theme is saved on this device.') }}</p>
 

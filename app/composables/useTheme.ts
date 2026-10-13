@@ -1,3 +1,6 @@
+import type { CustomTheme } from '~/utils/customThemes'
+import type { ThemeDef } from '~/utils/themes'
+
 // App theme: chosen in Settings (kept on the device), applied
 // right away through the data-theme attribute of <html>, with the color of the
 // iOS bar (theme-color) and the terminal palette. "Follow Herdr": the
@@ -5,8 +8,21 @@
 
 export const FOLLOW_HERDR = 'follow'
 
+// Themes made on this device (utils/customThemes.ts), kept on the device.
+function readCustomThemes() {
+  try { return parseCustomThemes(localStorage.getItem(CUSTOM_KEY)) }
+  catch { return [] }
+}
+export const customThemes = ref<CustomTheme[]>(import.meta.client ? readCustomThemes() : [])
+
+// Built-in or custom theme by id.
+export const resolveTheme = (id: string | null | undefined): ThemeDef | undefined => {
+  const ct = customThemes.value.find(t => t.id === id)
+  return ct ? customThemeDef(ct) : themeById(id)
+}
+
 function readChoice() {
-  try { return storedThemeChoice(localStorage.getItem('theme'), FOLLOW_HERDR) }
+  try { return storedThemeChoice(localStorage.getItem('theme'), FOLLOW_HERDR, customThemes.value.map(t => t.id)) }
   catch { return DEFAULT_THEME }
 }
 export const themeChoice = ref<string>(import.meta.client ? readChoice() : DEFAULT_THEME)
@@ -44,7 +60,9 @@ export const activeTheme = computed(() => {
     const r = resolveHerdrTheme(appConfig.value.herdrTheme, systemLight.value)
     return { def: themeById(r.id) || themeById(DEFAULT_THEME)!, custom: customVars(r.custom) }
   }
-  return { def: themeById(themeChoice.value) || themeById(DEFAULT_THEME)!, custom: {} as Record<string, string> }
+  const def = resolveTheme(themeChoice.value) || themeById(DEFAULT_THEME)!
+  // A custom theme: its base's stylesheet (data-theme) with every variable set inline.
+  return { def, custom: def.base ? themeVars(def) : {} as Record<string, string> }
 })
 
 // Color of the iOS bar (meta theme-color, set by useHead in app.vue).
@@ -54,7 +72,7 @@ let applied: string[] = []
 function apply() {
   const { def, custom } = activeTheme.value
   const root = document.documentElement
-  root.dataset.theme = def.id
+  root.dataset.theme = def.base || def.id
   for (const k of applied) root.style.removeProperty(k)
   applied = Object.keys(custom)
   for (const [k, v] of Object.entries(custom)) root.style.setProperty(k, v)
@@ -70,6 +88,10 @@ export function installTheme() {
   }
   apply()
   watch(activeTheme, apply)
+  watch(customThemes, (v) => {
+    try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(v)) }
+    catch { /* storage unavailable */ }
+  }, { deep: true })
   watch(themeChoice, (v) => {
     try { localStorage.setItem('theme', v) }
     catch { /* stockage indisponible */ }

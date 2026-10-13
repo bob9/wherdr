@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Custom themes**: Settings › Appearance › Theme › Customize copies the theme shown into an
+  editable theme: name, base theme, every color by role (base, highlights, states, palette),
+  and switches for the colored side bars and tinted backgrounds. Changes apply right away and
+  stay on the device; a theme is shared as a code (Copy theme code / Import theme).
+- **Foxur theme**: a quiet dark theme taken from a race quad (carbon, gunmetal, violet, a red
+  cap): one loud color for what waits for you, gray section titles, quota bars and agent
+  logos, no colored side bars and no tinted backgrounds.
+
+### Changed
+
+- Themes now set semantic roles (waiting for you, section titles, quota bars, logos and
+  icons, side bars, tints); every existing theme keeps its look.
+
 - Recall previous messages and slash commands with ↑/↓ in the message field, with per-agent history and draft restoration.
 
 - Make native menu arrows responsive, focus Claude settings tabs before switching, show the live Codex usage terminal with its subtitle, and dismiss stale command previews when native controls appear.

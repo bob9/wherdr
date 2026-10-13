@@ -32,6 +32,12 @@ export interface ThemeColors {
   working?: string
   blocked?: string
   done?: string
+  // Roles, so a theme can decide how loud each kind of element is
+  // (otherwise taken from the palette above):
+  attention?: string // what waits for you: title, side bar and answers of a blocked card (default: rose)
+  heading?: string // section titles and eyebrows (default: the accent)
+  meter?: string // quota bars below the warning thresholds (default: teal)
+  logo?: string // one color for every agent logo and the repo/branch icons (default: brand colors, green icons)
 }
 // Section of the theme picker: wherdr's own themes, themes inspired by the
 // coding agents, then Herdr's built-in themes (herdr.dev included).
@@ -42,7 +48,12 @@ export interface ThemeDef {
   label: string
   group: ThemeGroup
   light?: boolean
+  base?: string // custom theme: the built-in theme it starts from (utils/customThemes.ts)
   c: ThemeColors
+  // Colored side bars on cards and requests (default: on). Off: a plain line.
+  bars?: boolean
+  // Colored backgrounds behind blocked cards and their answers (default: on).
+  tints?: boolean
   // xterm ANSI palette: black, red, green, yellow, blue, magenta, cyan, white, then the bright ones.
   ansi: string[]
 }
@@ -190,6 +201,28 @@ export const THEMES: ThemeDef[] = [
       '#6b7280', '#ff7b86', '#6bffb0', '#fddb72', '#6ec9ff', '#e69dfc', '#75efea', '#f7f9fc'],
   },
   {
+    // Foxur — a quiet theme taken from a race quad, for phone users who found the
+    // demo too busy (too many colors and accent bars competing for attention). Carbon-fibre
+    // frame #121314 and gunmetal motor bells #2b2d31 for the base; the violet
+    // anodized screws #8f84e0 as the accent (working, selection, focus ring);
+    // the red antenna cap #e0675f as the only loud color, kept for what waits
+    // for you; copper motor windings #c98a4b for warnings; a muted race-banner
+    // lime #b3c25e for ready. Gray section titles, quota bars and agent logos,
+    // no colored side bars, no tinted backgrounds. Text #e6e6e8 (14.9:1),
+    // muted #9b9ea5 (6.9:1), accent 5.8:1, red cap 5.6:1.
+    id: 'foxur', label: 'Foxur', group: 'wherdr', bars: false, tints: false,
+    c: {
+      bg: '#121314', bg2: '#0e0f10', surface: '#1a1b1d', line: '#2b2d31',
+      text: '#e6e6e8', muted: '#9b9ea5', dim: '#7d8088',
+      accent: '#8f84e0', green: '#b3c25e', coral: '#c98a4b', ochre: '#c98a4b', rose: '#e0675f', blue: '#8f9fc2', teal: '#8aa9a6', lav: '#aaa2e6',
+      onAccent: '#0e0f10', selection: '#8f84e0', ring: '#8f84e0',
+      working: '#8f84e0', blocked: '#e0675f', done: '#b3c25e',
+      attention: '#e0675f', heading: '#9b9ea5', meter: '#6c7079', logo: '#9b9ea5',
+    },
+    ansi: ['#2b2d31', '#e0675f', '#b3c25e', '#d9c76a', '#8f9fc2', '#8f84e0', '#8aa9a6', '#c9cacd',
+      '#6c7079', '#ec847d', '#c6d37b', '#e6d78a', '#a8b6d4', '#aaa2e6', '#a4c0bd', '#f2f2f4'],
+  },
+  {
     id: 'catppuccin', label: 'Catppuccin', group: 'herdr',
     c: {
       bg: '#1e1e2e', bg2: '#181825', surface: '#262637', line: '#45475a', text: '#cdd6f4', muted: '#9399b2', dim: '#6c7086',
@@ -333,8 +366,9 @@ export const themeSections = () => THEME_GROUPS.map(group => ({
 
 // Theme choice read from the device: an id that no longer exists (removed
 // theme) falls back to the default instead of showing a raw id in Settings.
-export const storedThemeChoice = (v: string | null | undefined, follow: string) =>
-  v && (v === follow || themeById(v)) ? v : DEFAULT_THEME
+// `custom`: ids of the themes made on this device.
+export const storedThemeChoice = (v: string | null | undefined, follow: string, custom: string[] = []) =>
+  v && (v === follow || themeById(v) || custom.includes(v)) ? v : DEFAULT_THEME
 
 // CSS variables for the selected palette; main.css holds Titanium's first paint.
 export function themeVars(th: ThemeDef): Record<string, string> {
@@ -357,7 +391,14 @@ export function themeVars(th: ThemeDef): Record<string, string> {
     '--code-bg': th.light ? mix('var(--text)', 5) : 'color-mix(in srgb, #000 22%, var(--bg))',
     // Agents' brand colors (logos and name in the list), identical in all themes:
     // orange of the Claude Code crab, blue-violet of the Codex icon, magenta of the omp pi.
-    '--claude': '#d77757', '--codex': '#7a9dff', '--omp': '#c467e0',
+    '--claude': c.logo || '#d77757', '--codex': c.logo || '#7a9dff', '--omp': c.logo || '#c467e0',
+    '--attention': c.attention || 'var(--rose)',
+    '--heading': c.heading || 'var(--mauve)',
+    '--meter': c.meter || 'var(--teal)',
+    // One logo color: the repository and branch icons take it too, the omp logo goes gray.
+    '--icon': c.logo || 'var(--green)',
+    '--logo-filter': c.logo ? 'grayscale(1) brightness(1.15)' : 'none',
+    ...quietVars(th),
     '--selection': `color-mix(in srgb, ${c.selection || 'var(--accent)'} ${th.light ? 22 : 32}%, transparent)`,
     ...(c.ring ? { '--ring-2': c.ring } : {}),
     '--shadow': th.light ? 'rgba(60, 60, 80, .16)' : 'rgba(0, 0, 0, .5)',
@@ -375,6 +416,18 @@ export function themeVars(th: ThemeDef): Record<string, string> {
     '--text-strong': '#ffffff', '--code-bg': '#131316',
   })
   return vars
+}
+
+// Side bars and tinted backgrounds: on by default, a theme can turn them off.
+function quietVars(th: ThemeDef): Record<string, string> {
+  const bars = th.bars !== false, tints = th.tints !== false
+  return {
+    '--bar-w': bars ? '2px' : '0px',
+    '--attention-edge': bars ? 'var(--attention)' : 'var(--line)',
+    '--attention-bg': tints ? 'color-mix(in srgb, var(--attention) 8%, var(--bg-2))' : 'var(--bg-2)',
+    '--attention-fill': tints ? 'color-mix(in srgb, var(--attention) 6%, transparent)' : 'transparent',
+    '--attention-line': tints ? 'color-mix(in srgb, var(--attention) 35%, transparent)' : 'var(--line)',
+  }
 }
 
 // Stylesheet of all themes: [data-theme="…"] { --bg: … }.
